@@ -86,13 +86,15 @@ class VS:
 
     def get_homework_info(self):
         wb_data = self.session.get(self.homeworks[self.n]['link'], headers=self.headers)
-        pattern = re.compile('active">(.*?)<.*?<p><span(.*?)</p.*?answerText.*?>(.*?)<', re.S)
+        pattern = re.compile('active">(.*?)<.*?(<p><span.*?)answerText.*?>(.*?)<', re.S)
         items = re.findall(pattern, wb_data.text)
-        pattern = re.compile('>(.*?)<', re.S)
-        texts = re.findall(pattern, items[0][1])
+        pattern = re.compile('p>(.*?)</p', re.S)
+        parts = re.findall(pattern, items[0][1])
+        pattern = re.compile('>(.*?)</span>', re.S)
+        texts = re.findall(pattern, ''.join(list(parts)))
         info = {
             'title': items[0][0],
-            'text': '\n'.join(list(texts)[::3]),
+            'text': html.unescape('\n'.join(list(texts))),
             'answer': html.unescape(items[0][2]),
         }
         self.questioninfo = info
@@ -167,6 +169,40 @@ class VS:
                     if os.path.exists(in_put):
                         self.filepath = in_put
                         self.upload_code()
+                    elif re.match('id=.*? password=', in_put):
+                        pattern = re.compile('id=(.*?) password=(.*?);')
+                        id_passwd = re.findall(pattern, in_put)
+                        somebody_session = requests.session()
+                        data = {
+                            'UserName': id_passwd[0][0],
+                            'Password': id_passwd[0][1],
+                        }
+                        wb_data = somebody_session.post(self.loginpage, data=data, headers=self.headers)
+                        if wb_data.url != self.loginpage:
+                            somebody_session.get(self.coursepage, headers=self.headers)
+
+                            pattern = re.compile('answerText.*?>(.*?)<', re.S)
+                            #somebody_code = html.unescape(re.findall(pattern, somebody_session.get(self.homeworks[self.n]['link'], headers=self.headers).text)[0][0])
+                            somebody_code = somebody_session.get(self.homeworks[self.n]['link'], headers=self.headers).text
+                            somebody_code = re.findall(pattern, somebody_code)
+                            somebody_code = html.unescape(somebody_code)
+
+                            data = {
+                                'answerText': somebody_code,
+                                'endTime': '',
+                                'startTime': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                            }
+                            back = somebody_session.post(self.posturl + str(self.homeworks[self.n]['id']), data=data).text
+                            if re.search('恭喜你，所有用例均通过！', back):
+                                print('Success')
+                                data['answerText'] = '\n'.join(['Status\tSuccess', somebody_code])
+                                self.session.post(self.posturl + str(self.homeworks[self.n]['id']), data=data)
+                                if self.backuppath:
+                                    self.backup_code(self.questioninfo['title'], data['answerText'])
+                            else:
+                                print('Fail')
+                        else:
+                            print("登陆失败！请重新登陆！")
 
     def upload_code(self):
         f = open(self.filepath, "r")
