@@ -86,12 +86,15 @@ class VS:
 
     def get_homework_info(self):
         wb_data = self.session.get(self.homeworks[self.n]['link'], headers=self.headers)
-        pattern = re.compile('active">(.*?)<.*?(<p><span.*?)answerText.*?>(.*?)<', re.S)
+        pattern = re.compile('active">(.*?)<.*?(<p>.*?)answerText.*?>(.*?)<', re.S)
         items = re.findall(pattern, wb_data.text)
         pattern = re.compile('p>(.*?)</p', re.S)
         parts = re.findall(pattern, items[0][1])
-        pattern = re.compile('>(.*?)</span>', re.S)
-        texts = re.findall(pattern, ''.join(list(parts)))
+        if re.match('<span', parts[0]):
+            pattern = re.compile('<span.*?>(.*?)</span>', re.S)
+            texts = re.findall(pattern, ''.join(list(parts)))
+        else:
+            texts = parts
         info = {
             'title': items[0][0],
             'text': html.unescape('\n'.join(list(texts))),
