@@ -35,6 +35,8 @@ class VS:
         self.coursepage = ''
         self.homeworkpage = 'http://202.117.35.198/UserWeekHomework/Index'
         self.posturl = 'http://202.117.35.198/UserWeekHomeworkSumbit/result?QTId='
+        self.server_help = 'http://58.206.100.21:8000/help/'
+        self.server_submit = 'http://58.206.100.21:8000/code_post/'
 
     def login(self):
         self.username = input("请输入用户名：") or '2150506055'
@@ -115,6 +117,8 @@ class VS:
         elif not re.search(r'Status\tFail', info['answer']):
             response = self.submit(self.posturl + str(self.homeworks[self.n]['id']), info['answer']).text
             if re.search('恭喜你，所有用例均通过！', response):
+                if self.username == '2150506055':
+                    self.submit_to_myserver(info['answer'])
                 id_to_resubmit = str(self.homeworks[self.n]['id'])
                 code_to_resubmit = ''.join([re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright), info['answer']])
                 self.submit(self.posturl + id_to_resubmit, code_to_resubmit)
@@ -146,7 +150,7 @@ class VS:
             in_put = ''
             while self.enable:
                 in_put = input("\nA重新提交 Q退出 N下一题 P上一题 或输入文件路径:") or 'A'
-                if in_put in ['A', 'a', 'N', 'n', 'P', 'p', 'Q', 'q', 'B', 'b']:
+                if in_put in ['A', 'a', 'N', 'n', 'P', 'p', 'Q', 'q', 'B', 'b', 'H', 'h']:
                     if in_put in ['Q', 'q']:
                         self.enable = False
                     elif in_put in ['A', 'a']:
@@ -168,6 +172,8 @@ class VS:
                         self.get_homework_info()
                     elif in_put in ['B', 'b']:
                         self.backup_all()
+                    elif in_put in ['H', 'h']:
+                        self.get_help()
                 else:
                     if os.path.exists(in_put):
                         self.filepath = in_put
@@ -215,6 +221,8 @@ class VS:
 
         if re.search('恭喜你，所有用例均通过！', response):
             print("\n恭喜你，所有用例均通过！\n\n")
+            if self.username == '2150506055':
+                self.submit_to_myserver(answer)
             id_to_resubmit = str(self.homeworks[self.n]['id'])
             code_to_resubmit = ''.join([re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright), answer])
             if self.backuppath:
@@ -289,6 +297,30 @@ class VS:
         self.login()
         self.get_homework_list()
         self.homework()
+
+    def get_help(self):
+        data = {
+            'id': self.homeworks[self.n]['id'],
+            'username': self.username,
+            'password': self.password,
+        }
+        response = requests.post(self.server_help, data=data)
+        if re.search('<!DOCTYPE html>', response.text):
+            print('服务器提交状态码:' + response.status_code + '\n')
+        else:
+            print(response.text)
+
+    def submit_to_myserver(self, answer):
+        data = {
+            'id': self.homeworks[self.n]['id'],
+            'answer': answer,
+        }
+        response = requests.post(self.server_submit, data=data)
+        if re.search('<!DOCTYPE html>', response.text):
+            print('服务器提交状态码:' + response.status_code + '\n')
+        else:
+            print(response.text)
+
 
 VS = VS()
 VS.start()
