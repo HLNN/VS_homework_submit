@@ -137,10 +137,13 @@ class VS:
                         self.n = 0
                     self.get_homework_info()
                 else:
+                    id_to_resubmit = str(self.homeworks[self.n]['id'])
+                    code_to_resubmit = ''.join([re.sub('Success', 'Fail', re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright)), info['answer']])
                     if self.backuppath:
-                        self.backup_code(info['title'], ''.join([re.sub('Success', 'Fail', re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright)), info['answer']]))
+                        self.backup_code(info['title'], code_to_resubmit)
                     print(info['title'])
                     print(info['text'])
+                    self.submit(self.posturl + id_to_resubmit, code_to_resubmit)
             else:
                 if self.backuppath:
                     self.backup_code(info['title'], info['answer'])
@@ -302,7 +305,7 @@ class VS:
         f = open(filename, 'w')
         f.write(code)
         f.close()
-        print(items[0][1].strip() + ".cpp 备份成功!!!")
+        print(title + ".cpp 备份成功!!!")
 
     def get_help(self):
         try:
@@ -325,7 +328,7 @@ class VS:
                 'id': self.homeworks[self.n]['id'],
                 'answer': answer,
             }
-            response = requests.post(self.server_submit, data=data, timeout=5)
+            response = requests.post(self.server_submit, data=data, timeout=3)
             if re.search('<!DOCTYPE html>', response.text):
                 print('服务器提交状态码:' + response.status_code + '\n')
             else:
