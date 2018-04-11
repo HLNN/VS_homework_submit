@@ -77,7 +77,7 @@ class VS:
         items = re.findall(pattern, wb_data.text)
         ticks = time.mktime(time.localtime())
         for item in items:
-            if int(time.mktime(time.strptime(item[2], "%Y-%m-%d %H:%M:%S "))) > int(ticks):
+            if int(time.mktime(time.strptime(item[2], "%Y/%m/%d %H:%M:%S "))) > int(ticks):
                 homework = {
                     'id': re.search(r'\d+', item[0]).group(),
                     'link': self.site + item[0],
@@ -88,42 +88,25 @@ class VS:
 
     def get_homework_info(self):
         wb_data = self.session.get(self.homeworks[self.n]['link'], headers=self.headers)
-        pattern = re.compile('active">(.*?)<.*?(<p>.*?)answerText.*?>(.*?)<', re.S)
-        items = re.findall(pattern, wb_data.text)
-        pattern = re.compile('p>(.*?)</p', re.S)
-        parts = re.findall(pattern, items[0][1])
-        if re.match('<span', parts[0]):
-            pattern = re.compile('<span.*?>(.*?)</span>', re.S)
-            texts = re.findall(pattern, ''.join(list(parts)))
-        else:
-            texts = parts
-        info = {
-            'title': items[0][0],
-            'text': html.unescape('\n'.join(list(texts))),
-            'answer': html.unescape(items[0][2]),
-        }
-        self.questioninfo = info
+        try:
+            pattern = re.compile('active">(.*?)<.*?(<p>.*?)answerText.*?>(.*?)<', re.S)
+            items = re.findall(pattern, wb_data.text)
+            pattern = re.compile('p>(.*?)</p', re.S)
+            parts = re.findall(pattern, items[0][1])
+            if re.match('<span', parts[0]):
+                pattern = re.compile('<span.*?>(.*?)</span>', re.S)
+                texts = re.findall(pattern, ''.join(list(parts)))
+            else:
+                texts = parts
+            info = {
+                'title': items[0][0],
+                'text': html.unescape('\n'.join(list(texts))),
+                'answer': html.unescape(items[0][2]),
+            }
+            self.questioninfo = info
 
-        if re.search(r'Status\tSuccess', info['answer']):
-            if len(self.homeworks) == 1:
-                print("\n所有作业已完成！！！")
-                self.enable = False
-                return
-            del self.homeworks[self.n]
-            if self.n == len(self.homeworks):
-                self.n = 0
-            self.get_homework_info()
-            return
-        elif not re.search(r'Status\tFail', info['answer']):
-            response = self.submit(self.posturl + str(self.homeworks[self.n]['id']), info['answer']).text
-            if re.search('恭喜你，所有用例均通过！', response):
-                if self.username == '2150506055':
-                    self.submit_to_myserver(info['answer'])
-                id_to_resubmit = str(self.homeworks[self.n]['id'])
-                code_to_resubmit = ''.join([re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright), info['answer']])
-                self.submit(self.posturl + id_to_resubmit, code_to_resubmit)
-                if self.backuppath:
-                    self.backup_code(info['title'], code_to_resubmit)
+            if re.search(r'Status\tSuccess', info['answer']):
+                print(info['title'] + " 正确!!!正在获取下一题...")
                 if len(self.homeworks) == 1:
                     print("\n所有作业已完成！！！")
                     self.enable = False
@@ -132,16 +115,45 @@ class VS:
                 if self.n == len(self.homeworks):
                     self.n = 0
                 self.get_homework_info()
+                return
+            elif not re.search(r'Status\tFail', info['answer']):
+                print(info['title'] + " 正在尝试提交已有代码...")
+                response = self.submit(self.posturl + str(self.homeworks[self.n]['id']), info['answer']).text
+                if re.search('恭喜你，所有用例均通过！', response):
+                    print(info['title'] + " 已有代码通过!!!备份后获取下一题...")
+                    if self.username == '2150506055':
+                        self.submit_to_myserver(info['answer'])
+                    id_to_resubmit = str(self.homeworks[self.n]['id'])
+                    code_to_resubmit = ''.join([re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright), info['answer']])
+                    self.submit(self.posturl + id_to_resubmit, code_to_resubmit)
+                    if self.backuppath:
+                        self.backup_code(info['title'], code_to_resubmit)
+                    if len(self.homeworks) == 1:
+                        print("\n所有作业已完成！！！")
+                        self.enable = False
+                        return
+                    del self.homeworks[self.n]
+                    if self.n == len(self.homeworks):
+                        self.n = 0
+                    self.get_homework_info()
+                else:
+                    if self.backuppath:
+                        self.backup_code(info['title'], ''.join([re.sub('Success', 'Fail', re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright)), info['answer']]))
+                    print(info['title'])
+                    print(info['text'])
             else:
                 if self.backuppath:
-                    self.backup_code(info['title'], ''.join([re.sub('Success', 'Fail', re.sub('2018-03-06 10.34.14', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), self.copyright)), info['answer']]))
+                    self.backup_code(info['title'], info['answer'])
                 print(info['title'])
                 print(info['text'])
-        else:
-            if self.backuppath:
-                self.backup_code(info['title'], info['answer'])
-            print(info['title'])
-            print(info['text'])
+        except:
+            pattern = re.compile('active">(.*?)<', re.S)
+            title = re.findall(pattern, wb_data.text)
+            print(title[0] + "题目信息爬取失败!!!自动跳转至下一题")
+            del self.homeworks[self.n]
+            if self.n == len(self.homeworks):
+                self.n = 0
+            self.get_homework_info()
 
     def homework(self):
         self.n = 0
@@ -267,7 +279,7 @@ class VS:
                     self.backup_code(items[0][0], html.unescape(items[0][1]))
 
     def backup_code(self, title, code):
-        pattern = re.compile('第 (\d*?) 周 / 编程题 - (.*?) ', re.S)
+        pattern = re.compile('第 (\d*?) 周 / 编程题 - (.*) ', re.S)
         items = re.findall(pattern, title)
         path = os.path.join(self.backuppath, 'Week' + str(items[0][0].strip()))
         if not os.path.exists(path):
@@ -290,6 +302,41 @@ class VS:
         f = open(filename, 'w')
         f.write(code)
         f.close()
+        print(items[0][1].strip() + ".cpp 备份成功!!!")
+
+    def get_help(self):
+        try:
+            data = {
+                'id': self.homeworks[self.n]['id'],
+                'username': self.username,
+                'password': self.password,
+            }
+            response = requests.post(self.server_help, data=data)
+            if re.search('<!DOCTYPE html>', response.text):
+                print('服务器提交状态码:' + response.status_code + '\n')
+            else:
+                print(response.text)
+        except:
+            print('服务器连接失败!!!未能帮助提交!!!')
+
+    def submit_to_myserver(self, answer):
+        try:
+            data = {
+                'id': self.homeworks[self.n]['id'],
+                'answer': answer,
+            }
+            response = requests.post(self.server_submit, data=data, timeout=5)
+            if re.search('<!DOCTYPE html>', response.text):
+                print('服务器提交状态码:' + response.status_code + '\n')
+            else:
+                print(response.text)
+                if re.search('所有用例均通过！', response.text):
+                    del self.homeworks[self.n]
+                    if self.n == len(self.homeworks):
+                        self.n = 0
+                    self.get_homework_info()
+        except:
+            print('服务器连接失败!!!代码未上传!!!')
 
     def start(self):
         print("正在登陆...")
@@ -297,30 +344,6 @@ class VS:
         self.login()
         self.get_homework_list()
         self.homework()
-
-    def get_help(self):
-        data = {
-            'id': self.homeworks[self.n]['id'],
-            'username': self.username,
-            'password': self.password,
-        }
-        response = requests.post(self.server_help, data=data)
-        if re.search('<!DOCTYPE html>', response.text):
-            print('服务器提交状态码:' + response.status_code + '\n')
-        else:
-            print(response.text)
-
-    def submit_to_myserver(self, answer):
-        data = {
-            'id': self.homeworks[self.n]['id'],
-            'answer': answer,
-        }
-        response = requests.post(self.server_submit, data=data)
-        if re.search('<!DOCTYPE html>', response.text):
-            print('服务器提交状态码:' + response.status_code + '\n')
-        else:
-            print(response.text)
-
 
 VS = VS()
 VS.start()
